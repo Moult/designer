@@ -6,15 +6,18 @@
     </head>
     <body>
 <style>
-    canvas { width: 350px; }
+    canvas { width: 350px; border: 1px solid #F00; }
     #designer-wrapper { display: inline-block; width: 350px; }
     #designer-ui-controls { position: absolute; }
     #designer-ui-render { position: absolute; }
+    #layers-list { background-color: #ccc; }
 </style>
         <h1>Designer prototype</h1>
         arbitrary
         <div id="designer-wrapper"></div>
         <button id="add-image-layer" data-src="dolphin.png">add dolphin</button>
+        <button id="update-layers">update layers list</button>
+        <pre id="layers-list"></pre>
         <script src="designer.js"></script>
     </body>
 </html>

@@ -126,6 +126,7 @@ makkoto.widget.designer = function(wrapper_id, size) {
 
     this.loader = new createjs.LoadQueue();
     this.layers = [];
+    this.active_layer_id = null;
 };
 
 makkoto.widget.designer.prototype = {
@@ -144,9 +145,10 @@ makkoto.widget.designer.prototype = {
     },
 
     init: function() {
-        this.addEventToShowRenderCanvasOnMouseOut();
         this.drawProductDiffuseMap();
+        this.addEventToShowRenderCanvasOnMouseOut();
         this.drawDisplacementMap();
+        this.updateControls();
         this.updateRender();
     },
 
@@ -156,7 +158,6 @@ makkoto.widget.designer.prototype = {
         productBitmap.x = 0;
         productBitmap.y = 0;
         this.controls_stage.addChild(productBitmap);
-        this.controls_stage.update();
     },
 
     drawDisplacementMap: function() {
@@ -299,6 +300,7 @@ makkoto.widget.designer.prototype = {
         }
         var cloneBitmap = child.clone();
         cloneBitmap.alpha = 1;
+        cloneBitmap.visible = true;
         this.compositor_stage.addChild(cloneBitmap);
         this.compositor_stage.update();
     },
@@ -308,7 +310,7 @@ makkoto.widget.designer.prototype = {
     },
 
     isChildAControls: function(child) {
-        return child.name.substring(child.name.length - "-controls".length) == '-controls';
+        return child.name.indexOf('-controls') != -1;
     },
 
     compositeTemplateMask: function() {
@@ -505,6 +507,42 @@ makkoto.widget.designer.prototype = {
             self.updateRender();
         });
     },
+
+    setActiveLayerId: function(id) {
+        this.active_layer_id = id;
+    },
+
+    updateControls: function() {
+        for (var i = 0; i < this.controls_stage.children.length; i++) {
+            var child = this.controls_stage.children[i];
+            if (this.isChildPartOfTheActiveLayer(child) ||
+                this.isChildAProduct(child)) {
+                child.visible = true;
+            } else {
+                child.visible = false;
+            }
+        }
+        this.controls_stage.update();
+    },
+
+    isChildPartOfTheActiveLayer: function(child) {
+        var active_layer = this.getActiveLayer();
+        if ( ! active_layer) {
+            return false;
+        }
+        return child.name.indexOf(active_layer.resource_name);
+    },
+
+    getActiveLayer: function() {
+        var active_layer = null;
+        for (var i = 0; i < this.layers.length; i++) {
+            if (this.layers[i].layer_id == this.active_layer_id) {
+                active_layer = this.layers[i];
+                break;
+            }
+        }
+        return active_layer;
+    }
 }
 
 var designer = new makkoto.widget.designer('designer-wrapper', 500);
@@ -512,4 +550,8 @@ designer.preload();
 
 document.getElementById('add-image-layer').addEventListener('click', function() {
     designer.addPhotoLayer('myPhotoId', this.dataset.src);
+});
+
+document.getElementById('update-layers').addEventListener('click', function() {
+    console.log(designer.layers);
 });
