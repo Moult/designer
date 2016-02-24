@@ -137,6 +137,7 @@ makkoto.widget.designer.prototype = {
             { id: 'product-displacement', src: 'shirt.png' },
             { id: 'product-specular', src: 'shirt-specular.png' },
             { id: 'product-mask', src: 'shirt.png' }, // Not necessarily the same!
+            { id: 'controls-resize', src: 'controls-resize.png' },
             // TODO don't hardcode these
             { id: 'template', src: 'template.png' },
         ]);
@@ -197,6 +198,13 @@ makkoto.widget.designer.prototype = {
             resource_id: event_data.resource_id,
             resource_name: event_data.resource_name
         });
+        this.addLayerGraphic(event_data);
+        this.addLayerControls(event_data);
+        this.controls_stage.update();
+        this.updateRender();
+    },
+
+    addLayerGraphic: function(event_data) {
         var graphicBitmap = new createjs.Bitmap(
             this.loader.getResult(event_data.resource_name)
         );
@@ -208,21 +216,12 @@ makkoto.widget.designer.prototype = {
         graphicBitmap.resourceHeight = graphicBitmapBounds.height;
         this.addEventsForImageInteraction(graphicBitmap);
         this.controls_stage.addChild(graphicBitmap);
-        this.controls_stage.update();
-        this.updateRender();
+    },
 
-        // let's add controls
+    addLayerControls: function(event_data) {
+        var graphicBitmap = this.controls_stage.getChildByName(event_data.resource_name);
         var graphicBounds = graphicBitmap.getBounds();
-        var controls = this.getControlShape(
-            event_data.resource_name,
-            graphicBounds.x,
-            graphicBounds.y,
-            graphicBounds.width,
-            graphicBounds.height
-        );
-        this.addEventsForControlsInteraction(controls);
-        this.controls_stage.addChild(controls);
-        this.controls_stage.update();
+        this.drawControls(event_data.resource_name);
     },
 
     addEventsForImageInteraction(graphicBitmap) {
@@ -234,49 +233,42 @@ makkoto.widget.designer.prototype = {
     addEventToSetImageCenterOnMouseDown: function(graphicBitmap) {
         var self = this;
         graphicBitmap.on('mousedown', function(event) {
-            console.log('graphic mousedown');
-            var local = this.globalToLocal(event.stageX, event.stageY),
-                nx = this.regX - local.x,
-                ny = this.regY - local.y;
-            this.regX = local.x;
-            this.regY = local.y;
-            // this.x -= nx;
-            // this.y -= ny;
-            this.x = event.stageX;
-            this.y = event.stageY;
-
-            // TODO dup code!
-            var controls = self.controls_stage.getChildByName(this.controlsName),
-                local = controls.globalToLocal(event.stageX, event.stageY),
-                nx = controls.regX - local.x,
-                ny = controls.regY - local.y;
-            controls.regX = local.x;
-            controls.regY = local.y;
-            // controls.x -= nx;
-            // controls.y -= ny;
-            controls.x = event.stageX;
-            controls.y = event.stageY;
+            var controls = self.controls_stage.getChildByName(this.controlsName);
+            var controlResizeBitmap = self.controls_stage.getChildByName(this.controlsName + '-resize');
+            self.setCenterToMouseLocation(this, event);
+            self.setCenterToMouseLocation(controls, event);
+            self.setCenterToMouseLocation(controlResizeBitmap, event);
         });
+    },
+
+    setCenterToMouseLocation: function(child, event) {
+        var localMouseLocation = child.globalToLocal(event.stageX, event.stageY);
+        child.regX = localMouseLocation.x;
+        child.regY = localMouseLocation.y;
+        child.x = event.stageX;
+        child.y = event.stageY;
     },
 
     addEventToDragImageOnPressMove: function(graphicBitmap) {
         var self = this;
         graphicBitmap.on('pressmove', function(event) {
-            console.log('graphic pressmove');
-            this.x = event.stageX;
-            this.y = event.stageY;
-            // TODO dup code!
             var controls = self.controls_stage.getChildByName(this.controlsName);
-            controls.x = event.stageX;
-            controls.y = event.stageY;
+            var controlResizeBitmap = self.controls_stage.getChildByName(this.controlsName+'-resize');
+            self.setXYToMouseLocation(this, event);
+            self.setXYToMouseLocation(controls, event);
+            self.setXYToMouseLocation(controlResizeBitmap, event);
             self.controls_stage.update();
         });
+    },
+
+    setXYToMouseLocation: function(child, event) {
+        child.x = event.stageX;
+        child.y = event.stageY;
     },
 
     addEventToUpdateRenderOnPressUp: function(graphicBitmap) {
         var self = this;
         graphicBitmap.on('pressup', function(event) {
-            console.log('graphic pressup');
             self.updateRender();
         });
     },
@@ -365,29 +357,73 @@ makkoto.widget.designer.prototype = {
         this.render_stage.addChild(specularBitmap);
     },
 
-    getControlShape: function(resource_name, x, y, width, height) {
+    drawControls: function(resource_name) {
+        var controls = this.getControlShape(resource_name);
+        var controlBitmaps = this.getControlBitmaps(controls);
+        this.clearControlBitmaps(controls);
+        this.controls_stage.addChild(controls);
+        for (var i = 0; i < controlBitmaps.length; i++) {
+            this.controls_stage.addChild(controlBitmaps[i]);
+        }
+    },
+
+    getControlShape: function(resource_name) {
         var controls = new createjs.Shape();
-        controls.name = resource_name + '-controls';
-        controls.resourceName = resource_name;
-        controls.controlsWidth = width;
-        controls.controlsHeight = height;
+        var resource = this.controls_stage.getChildByName(resource_name);
+        this.setControlsCenterToTopLeftCornerOfResource(controls, resource);
+        this.setControlsMetadata(controls, resource);
+        this.drawControlGraphics(controls);
+        this.addEventsForControlsInteraction(controls);
+        return controls;
+    },
+
+    setControlsCenterToTopLeftCornerOfResource: function(controls, resource) {
+        var topLeftCoordinate = resource.localToGlobal(0, 0);
+        controls.regX = controls.regY = 0;
+        controls.x = topLeftCoordinate.x - 2;
+        controls.y = topLeftCoordinate.y - 2;
+    },
+
+    setControlsMetadata: function(controls, resource) {
+        var resourceBounds = resource.getBounds();
+        controls.name = resource.name + '-controls';
+        controls.resourceName = resource.name;
+        controls.controlsWidth = resourceBounds.width * resource.scaleX;
+        controls.controlsHeight = resourceBounds.height * resource.scaleY;
+    },
+
+    drawControlGraphics: function(controls) {
         controls.graphics
             .setStrokeStyle(2, 'round', 'miter', 10, true)
             .setStrokeDash([10, 8])
             .beginStroke('#333')
-            .drawRect(x - 2, y - 2, width + 4, height + 4)
-            .setStrokeStyle(0)
+            .drawRect(0, 0, controls.controlsWidth + 4, controls.controlsHeight + 4)
+            .setStrokeStyle(0, 'round', 'miter', 10, true)
             .beginFill('#333')
             .beginStroke('rgba(0,0,0,0)')
-            .drawCircle(x - 2 + width + 2, y - 2 + height + 2, 15)
+            .drawCircle(controls.controlsWidth + 2, controls.controlsHeight + 2, 15)
             ;
-        return controls;
+    },
+
+    clearControlBitmaps: function(controls) {
+        this.controls_stage.removeChild(
+            this.controls_stage.getChildByName(controls.name + '-resize')
+        );
+    },
+
+    getControlBitmaps: function(controls) {
+        var resizeBitmap = new createjs.Bitmap(this.loader.getResult('controls-resize'));
+        resizeBitmap.name = controls.name + '-resize';
+        resizeBitmap.regX = controls.regX;
+        resizeBitmap.regY = controls.regY;
+        resizeBitmap.x = controls.x + controls.controlsWidth - 5.5;
+        resizeBitmap.y = controls.y + controls.controlsHeight - 5.5;
+        return [resizeBitmap];
     },
 
     addEventsForControlsInteraction: function(controls) {
         var self = this;
         controls.on('mousedown', function(event) {
-            console.log('control mousedown');
             // TODO this does nothing at the moment :)
             // TODO also it's probably wrong because it doesn't use the redrawn
             // TODO control width
@@ -409,8 +445,13 @@ makkoto.widget.designer.prototype = {
             // console.log('scale not registered');
         });
 
+        this.addEVentToScaleImageOnControlsPressMove(controls);
+        this.addEventToRedrawControlsOnPressUp(controls);
+    },
+
+    addEVentToScaleImageOnControlsPressMove: function(controls) {
+        var self = this;
         controls.on('pressmove', function(event) {
-            console.log('control pressmove');
             // TODO: make sure we are pressing the scale control!
             var resource = self.controls_stage.getChildByName(this.resourceName);
             var resourceBounds = resource.getBounds();
@@ -422,46 +463,45 @@ makkoto.widget.designer.prototype = {
             resource.regX = resource.regY = 0;
             resource.x = topLeftCoordinate.x;
             resource.y = topLeftCoordinate.y;
-            // this.regX = this.regY = 0;
-            // this.x = topLeftCoordinate.x;
-            // this.y = topLeftCoordinate.y;
+
+            this.regX = this.regY = 0;
+            this.x = topLeftCoordinate.x - 2;
+            this.y = topLeftCoordinate.y - 2;
 
             // apply aspect ratio maintaining scale
             var newScaleX = scaledWidth / resource.resourceWidth;
             var newScaleY = scaledHeight / resource.resourceHeight;
 
-            var sY = scaledHeight / this.controlsHeight;
-            var sX = scaledWidth / this.controlsWidth;
-            console.log(this.controlsWidth);
-            console.log(this.controlsHeight);
-
-            if (scaledWidth < resource.resourceWidth && newScaleX < newScaleY) {
-                // this.scaleX = this.scaleY = sY;
+            this.graphics.clear();
+            if (scaledWidth < resource.resourceWidth &&
+                newScaleX < newScaleY) {
+                this.controlsWidth = resource.resourceWidth * newScaleY;
+                this.controlsHeight = scaledHeight;
                 resource.scaleX = resource.scaleY = newScaleY;
             } else {
-                // this.scaleX = this.scaleY = sX;
+                this.controlsWidth = scaledWidth;
+                this.controlsHeight = resourceBounds.height * newScaleX;
                 resource.scaleX = resource.scaleY = newScaleX;
             }
-
+            self.drawControlGraphics(this);
+            self.clearControlBitmaps(this);
+            var controlBitmaps = self.getControlBitmaps(this);
+            for (var i = 0; i < controlBitmaps.length; i++) {
+                self.controls_stage.addChild(controlBitmaps[i]);
+            }
             self.controls_stage.update();
         });
+    },
 
+    addEventToRedrawControlsOnPressUp: function(controls) {
+        var self = this;
         controls.on('pressup', function() {
-            console.log('control pressup');
             var resource = self.controls_stage.getChildByName(this.resourceName);
             var resourceBounds = resource.getBounds();
             var global = resource.localToGlobal(0, 0);
-            var newControl = self.getControlShape(
-                this.resourceName,
-                global.x, global.y,
-                resourceBounds.width * resource.scaleX,
-                resourceBounds.height * resource.scaleY
-            );
-            self.addEventsForControlsInteraction(newControl);
+            self.drawControls(this.resourceName);
             self.controls_stage.removeChild(this);
-            self.controls_stage.addChild(newControl);
             self.controls_stage.update();
-
             self.updateRender();
         });
     },
