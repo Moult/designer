@@ -526,22 +526,54 @@ makkoto.widget.designer.prototype = {
     },
 
     isChildPartOfTheActiveLayer: function(child) {
-        var active_layer = this.getActiveLayer();
+        var active_layer = this.getLayerFromId(this.active_layer_id);
         if ( ! active_layer) {
             return false;
         }
         return child.name.indexOf(active_layer.resource_name);
     },
 
-    getActiveLayer: function() {
-        var active_layer = null;
+    getLayerFromId: function(layer_id) {
+        var layer_index = this.getLayerIndexFromid(layer_id);
+        if ( ! layer_index) {
+            return null;
+        } else {
+            return this.layers[layer_index];
+        }
+    },
+
+    getLayerIndexFromid: function(layer_id) {
         for (var i = 0; i < this.layers.length; i++) {
-            if (this.layers[i].layer_id == this.active_layer_id) {
-                active_layer = this.layers[i];
-                break;
+            if (this.layers[i].layer_id == layer_id) {
+                return i;
             }
         }
-        return active_layer;
+        return null;
+    },
+
+    setLayerTemplate: function(layer_id, template_id, template_src) {
+        var layer_index = this.getLayerIndexFromid(layer_id);
+        if ( ! layer_index) {
+            return;
+        }
+        this.loadLayerTemplate(layer_id, template_id, template_src);
+    },
+
+    loadLayerTemplate: function(layer_id, template_id, template_src) {
+        var template_name = layer_id + '-template-' + template_id;
+        this.loader.on('complete', this.__proto__.addLayerTemplate, this, true, {
+            layer_index: layer_index,
+            template_id: template_id,
+            template_src: template_src,
+            template_name: template_name
+        });
+        this.loader.loadFile({ id: resource_name, src: resource_src });
+    },
+
+    addLayerTemplate: function(event, event_data) {
+        // TODO
+        // set the template details in our records
+        // do some rendering tasks, perhaps.
     }
 }
 
